@@ -19,6 +19,8 @@ class RuntimeSettings(BaseSettings):
     database_path: Path = Path("var/zentist-rpa.sqlite3")
     report_output_dir: Path = Path("var/reports")
     email_output_dir: Path = Path("var/email")
+    orangehrm_username_secret: str | None = Field(default=None, min_length=3)
+    orangehrm_password_secret: str | None = Field(default=None, min_length=3)
 
     @model_validator(mode="after")
     def require_report_recipient(self) -> Self:

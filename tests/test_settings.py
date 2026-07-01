@@ -8,7 +8,7 @@ def test_runtime_settings_require_report_recipient(monkeypatch: pytest.MonkeyPat
     monkeypatch.delenv("ZENTIST_RPA_REPORT_RECIPIENT", raising=False)
 
     with pytest.raises(ValidationError, match="ZENTIST_RPA_REPORT_RECIPIENT"):
-        RuntimeSettings()
+        RuntimeSettings(_env_file=None)
 
 
 def test_runtime_settings_load_report_recipient(monkeypatch: pytest.MonkeyPatch) -> None:

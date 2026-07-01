@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 from uuid import uuid4
 
 if TYPE_CHECKING:
@@ -29,7 +29,7 @@ class RunContext:
     portal_filter: tuple[str, ...] = ()
 
     @classmethod
-    def new(cls, *, portal_filter: tuple[str, ...] = ()) -> RunContext:
+    def new(cls, *, portal_filter: tuple[str, ...] = ()) -> Self:
         return cls(
             run_id=f"run-{uuid4().hex}",
             started_at=datetime.now(tz=UTC),

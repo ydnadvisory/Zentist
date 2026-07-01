@@ -22,6 +22,8 @@ Copy `.env.example` to `.env` for local runs and set the recipient placeholder:
 
 ```bash
 ZENTIST_RPA_REPORT_RECIPIENT=ops@example.com
+ZENTIST_RPA_ORANGEHRM_USERNAME_SECRET=<orangehrm-username>
+ZENTIST_RPA_ORANGEHRM_PASSWORD_SECRET=<orangehrm-password>
 ```
 
 Do not put real portal credentials, tokens, salary data, or sensitive screenshots in committed files.
@@ -31,6 +33,8 @@ Do not put real portal credentials, tokens, salary data, or sensitive screenshot
 ```bash
 uv run zentist-rpa structure
 uv run zentist-rpa check-config
+uv run zentist-rpa run --portal orangehrm --employee-json employees.json
+uv run zentist-rpa run --portal orangehrm --employee-json employees.json --headed
 uv run ruff format --check .
 uv run ruff check .
 uv run ty check src
@@ -39,6 +43,37 @@ uv build
 ```
 
 The `check-config` command validates runtime configuration before any browser side effects.
+
+## Running OrangeHRM
+
+Create a local employee JSON file outside version control:
+
+```json
+[
+  {
+    "employee_key": "emp001",
+    "first_name": "Jane",
+    "last_name": "Smith",
+    "job_title": "Account Assistant",
+    "employment_status": "Full-Time Permanent",
+    "annual_salary": "90000"
+  }
+]
+```
+
+Run Portal A in headless mode:
+
+```bash
+uv run zentist-rpa run --portal orangehrm --employee-json employees.json
+```
+
+Use `--headed` when you need to watch or debug the browser:
+
+```bash
+uv run zentist-rpa run --portal orangehrm --employee-json employees.json --headed
+```
+
+Each run creates a run id, persists outcomes to `ZENTIST_RPA_DATABASE_PATH`, writes a summary report under `ZENTIST_RPA_REPORT_OUTPUT_DIR`, and writes the local email message under `ZENTIST_RPA_EMAIL_OUTPUT_DIR`.
 
 ## Project Layout
 

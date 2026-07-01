@@ -205,12 +205,13 @@ tempCodeRunnerFile.py
 *.temp
 *.swp
 *.swo
+*.png
 *~
 
 # IDEs and editors
 # Uncomment if the project decides not to commit shared editor settings.
 # .idea/
-# .vscode/
+.vscode/
 .project
 .pydevproject
 
