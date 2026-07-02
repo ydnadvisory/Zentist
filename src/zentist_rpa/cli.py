@@ -15,11 +15,11 @@ from zentist_rpa.connectors.reporting import render_summary_report
 from zentist_rpa.connectors.result_store import SQLiteResultStore
 from zentist_rpa.connectors.settings import RuntimeSettings
 from zentist_rpa.core.models import OutcomeStatus, RunContext, RunStatus, WorkItemOutcome
-from zentist_rpa.portals.orangehrm.orangehrm import EmployeesInput, OrangeHRM, OrangeHRMContext
-from zentist_rpa.services.playwright_service import PlaywrightService
+from zentist_rpa.portals.registry import get_portal, get_portal_names, register_portal
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
 
 STRUCTURE_TEXT = """core: runner contracts, run context, outcomes, exceptions
 connectors: settings, secrets, persistence, reports, email
@@ -29,7 +29,20 @@ portals/saucedemo: Sauce Demo page objects and workflows
 """
 
 
+def _register_default_portals() -> None:
+    from zentist_rpa.portals.orangehrm.adapter import ORANGEHRM_ADAPTER
+
+    if "orangehrm" not in get_portal_names():
+        register_portal(ORANGEHRM_ADAPTER)
+
+
 def build_parser() -> argparse.ArgumentParser:
+    _register_default_portals()
+    available_portals = get_portal_names()
+    if not available_portals:
+        msg = "No portals are currently registered."
+        raise RuntimeError(msg)
+
     parser = argparse.ArgumentParser(
         prog="zentist-rpa",
         description="Run and validate the Zentist RPA automation foundation.",
@@ -45,24 +58,18 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser = subcommands.add_parser("run", help="Run a configured portal automation.")
     run_parser.add_argument(
         "--portal",
-        choices=("orangehrm",),
-        default="orangehrm",
+        choices=available_portals,
+        default=available_portals[0],
         help="Portal automation to run.",
     )
-    run_parser.add_argument(
-        "--employee-json",
-        type=Path,
-        help="Path to a JSON array of OrangeHRM employee records.",
-    )
-    run_parser.add_argument(
-        "--headed",
-        action="store_true",
-        help="Run the browser headed instead of headless.",
-    )
+
+    for portal_name in available_portals:
+        get_portal(portal_name).configure_parser(run_parser)
+
     return parser
 
 
-def _load_employee_records(path: Path | None) -> EmployeesInput:
+def _load_employee_records(path: Path | None) -> list[dict[str, str]] | None:
     if path is None:
         return None
 
@@ -119,34 +126,15 @@ def _write_report(
     return report_path
 
 
-async def _run_orangehrm(
-    args: argparse.Namespace,
-    context: OrangeHRMContext,
+def _run_selected_portal(
+    *, args: argparse.Namespace, context: RunContext, settings: RuntimeSettings
 ) -> list[WorkItemOutcome]:
-    employee_records = _load_employee_records(args.employee_json)
-    runner = OrangeHRM(
-        playwright_service=PlaywrightService(headless=not args.headed),
-        employee_records=employee_records,
-    )
-    return list(await runner.run(context))
+    adapter = get_portal(args.portal)
+    return list(asyncio.run(adapter.run(args, context, settings)))
 
 
 def _has_failed_outcome(outcomes: Sequence[WorkItemOutcome]) -> bool:
     return any(outcome.status == OutcomeStatus.FAILURE for outcome in outcomes)
-
-
-def _require_orangehrm_settings(settings: RuntimeSettings) -> None:
-    missing = [
-        name
-        for name, value in (
-            ("ZENTIST_RPA_ORANGEHRM_USERNAME_SECRET", settings.orangehrm_username_secret),
-            ("ZENTIST_RPA_ORANGEHRM_PASSWORD_SECRET", settings.orangehrm_password_secret),
-        )
-        if not value
-    ]
-    if missing:
-        msg = f"Missing required OrangeHRM configuration: {', '.join(missing)}"
-        raise ValueError(msg)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -171,15 +159,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise RuntimeError(msg)
 
         try:
-            _require_orangehrm_settings(settings)
-        except ValueError as exc:
-            parser.exit(status=2, message=f"Configuration error: {exc}\n")
-
-        try:
-            context = OrangeHRMContext.new(portal_filter=(args.portal,))
+            adapter = get_portal(args.portal)
+            adapter.validate_settings(settings)
+            context = adapter.build_context(args)
             store = SQLiteResultStore(settings.database_path)
             store.start_run(context)
-            outcomes = asyncio.run(_run_orangehrm(args, context))
+            outcomes = _run_selected_portal(args=args, context=context, settings=settings)
             store.record_outcomes(context.run_id, outcomes)
             store.finish_run(
                 context.run_id,

@@ -85,6 +85,17 @@ def test_run_rejects_missing_orangehrm_settings(
     assert "Missing required OrangeHRM configuration" in capsys.readouterr().err
 
 
+def test_run_rejects_unregistered_portal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ZENTIST_RPA_REPORT_RECIPIENT", "ops@example.com")
+
+    with pytest.raises(SystemExit) as exc:
+        main(["run", "--portal", "saucedemo"])
+
+    assert exc.value.code == CONFIG_ERROR_EXIT
+
+
 def test_run_persists_outcomes_and_sends_report(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -101,10 +112,13 @@ def test_run_persists_outcomes_and_sends_report(
     monkeypatch.setenv("ZENTIST_RPA_REPORT_OUTPUT_DIR", str(report_dir))
     monkeypatch.setenv("ZENTIST_RPA_EMAIL_OUTPUT_DIR", str(email_dir))
 
-    async def fake_run_orangehrm(
+    def fake_run_selected_portal(
+        *,
         args: Namespace,
         context: RunContext,
+        settings: object,
     ) -> list[WorkItemOutcome]:
+        del settings
         assert args.portal == "orangehrm"
         assert context.portal_filter == ("orangehrm",)
         return [
@@ -116,7 +130,7 @@ def test_run_persists_outcomes_and_sends_report(
             )
         ]
 
-    monkeypatch.setattr(cli, "_run_orangehrm", fake_run_orangehrm)
+    monkeypatch.setattr(cli, "_run_selected_portal", fake_run_selected_portal)
 
     assert main(["run"]) == 0
 
@@ -183,10 +197,13 @@ def test_run_orangehrm_persists_report_and_email(
     monkeypatch.setenv("ZENTIST_RPA_REPORT_OUTPUT_DIR", str(report_dir))
     monkeypatch.setenv("ZENTIST_RPA_EMAIL_OUTPUT_DIR", str(email_dir))
 
-    async def fake_run_orangehrm(
+    def fake_run_selected_portal(
+        *,
         args: Namespace,
         context: RunContext,
+        settings: object,
     ) -> list[WorkItemOutcome]:
+        del settings
         assert args.employee_json == employee_path
         assert context.portal_filter == ("orangehrm",)
         return [
@@ -198,7 +215,7 @@ def test_run_orangehrm_persists_report_and_email(
             )
         ]
 
-    monkeypatch.setattr("zentist_rpa.cli._run_orangehrm", fake_run_orangehrm)
+    monkeypatch.setattr("zentist_rpa.cli._run_selected_portal", fake_run_selected_portal)
 
     assert main(["run", "--portal", "orangehrm", "--employee-json", str(employee_path)]) == 0
 
@@ -262,10 +279,13 @@ def test_run_returns_nonzero_when_portal_reports_failed_outcome(
     monkeypatch.setenv("ZENTIST_RPA_REPORT_OUTPUT_DIR", str(tmp_path / "reports"))
     monkeypatch.setenv("ZENTIST_RPA_EMAIL_OUTPUT_DIR", str(tmp_path / "email"))
 
-    async def fake_run_orangehrm(
+    def fake_run_selected_portal(
+        *,
         args: Namespace,
         context: RunContext,
+        settings: object,
     ) -> list[WorkItemOutcome]:
+        del settings
         del args, context
         return [
             WorkItemOutcome(
@@ -276,7 +296,7 @@ def test_run_returns_nonzero_when_portal_reports_failed_outcome(
             )
         ]
 
-    monkeypatch.setattr(cli, "_run_orangehrm", fake_run_orangehrm)
+    monkeypatch.setattr(cli, "_run_selected_portal", fake_run_selected_portal)
 
     assert main(["run"]) == 1
 
