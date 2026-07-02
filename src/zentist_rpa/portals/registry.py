@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Coroutine
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import argparse
@@ -15,7 +15,7 @@ PortalContextBuilder = Callable[["argparse.Namespace"], "RunContext"]
 PortalSettingsValidator = Callable[["RuntimeSettings"], None]
 PortalRunnerCallable = Callable[
     ["argparse.Namespace", "RunContext", "RuntimeSettings"],
-    Coroutine[Any, Any, list["WorkItemOutcome"]],
+    Awaitable[list["WorkItemOutcome"]],
 ]
 
 

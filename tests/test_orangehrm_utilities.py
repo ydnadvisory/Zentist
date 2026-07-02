@@ -44,6 +44,38 @@ def test_salary_attachment_text_contains_target_employee_details() -> None:
     assert "Processing Date: 2026-07-01" in text
 
 
+def test_choose_select_option_finds_by_normalized_case_and_spacing() -> None:
+    resolved = OrangeHRMUtilities._resolve_select_option(  # noqa: SLF001
+        "Employment Status",
+        "  contract  ",
+        ["-- Select --", "Freelance", "Full-Time Contract", "Full-Time Permanent", "Part-Time Internship"],
+    )
+
+    assert resolved == "Full-Time Contract"
+
+
+def test_choose_select_option_prefers_exact_match() -> None:
+    resolved = OrangeHRMUtilities._resolve_select_option(  # noqa: SLF001
+        "Job Title",
+        "Software Engineer",
+        ["Software Architect", "Software Engineer", "Software QA"],
+    )
+
+    assert resolved == "Software Engineer"
+
+
+def test_choose_select_option_raises_when_unmatched() -> None:
+    with pytest.raises(
+        AssertionError,
+        match="Could not resolve 'Software Intern' for 'Job Title' from dropdown options",
+    ):
+        OrangeHRMUtilities._resolve_select_option(  # noqa: SLF001
+            "Job Title",
+            "Software Intern",
+            ["Software Architect", "Quality Specialist"],
+        )
+
+
 def test_salary_attachment_write_creates_deterministic_file(tmp_path: Path) -> None:
     employee = EmployeeRecord(
         employee_key="emp001",

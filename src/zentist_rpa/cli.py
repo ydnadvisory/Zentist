@@ -129,7 +129,11 @@ def _run_selected_portal(
     *, args: argparse.Namespace, context: RunContext, settings: RuntimeSettings
 ) -> list[WorkItemOutcome]:
     adapter = get_portal(args.portal)
-    return list(asyncio.run(adapter.run(args, context, settings)))
+
+    async def _run() -> list[WorkItemOutcome]:
+        return await adapter.run(args, context, settings)
+
+    return list(asyncio.run(_run()))
 
 
 def _has_failed_outcome(outcomes: Sequence[WorkItemOutcome]) -> bool:

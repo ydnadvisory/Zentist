@@ -28,7 +28,7 @@ class OrangeHRMContext(RunContext): ...
 
 
 class OrangeHRM(PortalRunner[OrangeHRMContext]):
-    _employee_records: set[EmployeeRecord]
+    _input_records: dict[str, EmployeeRecord]
     _salary_attachment_dir = Path("var/orangehrm/salary-attachments")
     _utilities = OrangeHRMUtilities
 
@@ -191,7 +191,7 @@ if __name__ == "__main__":
             "first_name": "John",
             "last_name": "Doe",
             "job_title": "Software Engineer",
-            "employment_status": "Full-time",
+            "employment_status": "Full-Time Permanent",
             "annual_salary": "80000",
         },
         {
@@ -199,7 +199,7 @@ if __name__ == "__main__":
             "first_name": "Jane",
             "last_name": "Smith",
             "job_title": "Product Manager",
-            "employment_status": "Full-time",
+            "employment_status": "Full-Time Permanent",
             "annual_salary": "90000",
         },
     ]

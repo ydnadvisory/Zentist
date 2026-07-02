@@ -2,7 +2,7 @@
 
 > Status: Draft
 > Scope: Part 1 Portal A and Part 2 production scale design
-> Last updated: 2026-07-01
+> Last updated: 2026-07-02
 
 ## Purpose
 
@@ -12,26 +12,9 @@ Portal A is OrangeHRM. Portal B is Sauce Demo. Sauce Demo still matters because 
 
 ## References
 
-- `.docs/zentist-rpa-part-1.md`: Part 1 scope and acceptance criteria.
-- `.docs/zentist-rpa-production-scale.md`: Part 2 production expectations.
-- `.docs/architecture/*.md`: local notes on page objects, connectors, queues, orchestration, secrets, idempotency, and observability.
 - `src/zentist_rpa/core/`: runner contract, run context, outcomes, and exception taxonomy.
 - `src/zentist_rpa/connectors/`: settings, secrets, SQLite persistence, reports, and email boundaries.
 - `src/zentist_rpa/portals/orangehrm/`: Portal A models, workflow, and Playwright utilities.
-
-## Goals
-
-Part 1 needs to prove a reusable RPA foundation, not just a one-off browser script. For each OrangeHRM employee record, the runner should find or create the employee, bring Job details to the requested state, and make sure the intended salary attachment exists without adding duplicate same-day files.
-
-Part 2 explains how the same runner boundary can survive production scale: around 100 portals, a few hundred daily jobs, and about 30,000 daily work items. The answer is not a rewrite of the bot. The runner layer should sit inside a durable control plane for scheduling, queueing, workers, state, artifacts, monitoring, and recovery.
-
-## Non-Goals
-
-- Building the Part 2 platform in this repository.
-- Replacing the Part 1 runner contract with scheduler-specific code.
-- Adding cloud infrastructure, dashboards, Terraform, or deployment code.
-- Storing real credentials, salary data, or sensitive screenshots in committed files.
-- Promising that public demo portals will stay stable.
 
 ## Figure ZQ9
 
@@ -56,15 +39,15 @@ The main rule is simple: shared orchestration depends on `PortalRunner`, not on 
 
 The repository already has the important boundaries for this design:
 
-| Boundary | Current module | Responsibility |
-|---|---|---|
-| Runner contract | `src/zentist_rpa/core/runner.py` | Defines the portal-neutral `PortalRunner` protocol. |
-| Run and outcome models | `src/zentist_rpa/core/models.py` | Defines `RunContext`, `WorkItemOutcome`, and status enums. |
-| Result store | `src/zentist_rpa/connectors/result_store.py` | Persists run rows and per-item outcomes through a SQLite-backed connector. |
-| Runtime config | `src/zentist_rpa/connectors/settings.py` | Loads `ZENTIST_RPA_` settings and fails before browser side effects when required config is missing. |
-| Portal A model | `src/zentist_rpa/portals/orangehrm/models.py` | Defines `EmployeeRecord` with employee key, name, job, status, salary, and currency. |
-| Portal A workflow | `src/zentist_rpa/portals/orangehrm/orangehrm.py` | Authenticates, iterates employee inputs, records one `WorkItemOutcome` per employee, and isolates item failures. |
-| Portal A page actions | `src/zentist_rpa/portals/orangehrm/utilities.py` | Encapsulates OrangeHRM navigation, search, add employee, Job update, and Salary attachment behavior. |
+| Boundary               | Current module                                   | Responsibility                                                                                                   |
+| ---------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Runner contract        | `src/zentist_rpa/core/runner.py`                 | Defines the portal-neutral `PortalRunner` protocol.                                                              |
+| Run and outcome models | `src/zentist_rpa/core/models.py`                 | Defines `RunContext`, `WorkItemOutcome`, and status enums.                                                       |
+| Result store           | `src/zentist_rpa/connectors/result_store.py`     | Persists run rows and per-item outcomes through a SQLite-backed connector.                                       |
+| Runtime config         | `src/zentist_rpa/connectors/settings.py`         | Loads `ZENTIST_RPA_` settings and fails before browser side effects when required config is missing.             |
+| Portal A model         | `src/zentist_rpa/portals/orangehrm/models.py`    | Defines `EmployeeRecord` with employee key, name, job, status, salary, and currency.                             |
+| Portal A workflow      | `src/zentist_rpa/portals/orangehrm/orangehrm.py` | Authenticates, iterates employee inputs, records one `WorkItemOutcome` per employee, and isolates item failures. |
+| Portal A page actions  | `src/zentist_rpa/portals/orangehrm/utilities.py` | Encapsulates OrangeHRM navigation, search, add employee, Job update, and Salary attachment behavior.             |
 
 Some files are still moving. This document describes the intended design boundary, not a promise that every acceptance criterion is complete in the current working tree.
 
@@ -76,15 +59,15 @@ Portal A accepts employee records. Each record is keyed by `employee_key`, which
 
 Required fields:
 
-| Field | Purpose |
-|---|---|
-| `employee_key` | Stable business key and OrangeHRM Employee Id. |
-| `first_name` | Required when adding a missing employee. |
-| `last_name` | Required when adding a missing employee. |
-| `job_title` | Target Job Title value in OrangeHRM. |
-| `employment_status` | Target Employment Status value in OrangeHRM. |
-| `annual_salary` | Demo salary value written to the generated attachment. |
-| `currency` | Optional display currency, defaulting to `USD`. |
+| Field               | Purpose                                                |
+| ------------------- | ------------------------------------------------------ |
+| `employee_key`      | Stable business key and OrangeHRM Employee Id.         |
+| `first_name`        | Required when adding a missing employee.               |
+| `last_name`         | Required when adding a missing employee.               |
+| `job_title`         | Target Job Title value in OrangeHRM.                   |
+| `employment_status` | Target Employment Status value in OrangeHRM.           |
+| `annual_salary`     | Demo salary value written to the generated attachment. |
+| `currency`          | Optional display currency, defaulting to `USD`.        |
 
 Duplicate input keys should be handled before browser side effects. Either collapse them to one target record by a clear rule or fail validation explicitly. Silent duplicate processing makes reruns hard to reason about.
 
@@ -145,15 +128,15 @@ The attachment content should include employee key, employee name, job title, em
 
 Portal A failures need enough context for an operator or developer to act:
 
-| Failure | Outcome behavior |
-|---|---|
-| Missing runtime config | Fail before browser side effects. |
-| Login or navigation failure | Return a run-visible failure with operation context. |
-| Employee search timeout | Capture a safe debug artifact reference and mark that employee failed. |
-| Multiple employee rows for one key | Mark the employee failed; do not guess which row to edit. |
-| Job select option missing | Mark the employee failed with the missing field and option. |
+| Failure                              | Outcome behavior                                                          |
+| ------------------------------------ | ------------------------------------------------------------------------- |
+| Missing runtime config               | Fail before browser side effects.                                         |
+| Login or navigation failure          | Return a run-visible failure with operation context.                      |
+| Employee search timeout              | Capture a safe debug artifact reference and mark that employee failed.    |
+| Multiple employee rows for one key   | Mark the employee failed; do not guess which row to edit.                 |
+| Job select option missing            | Mark the employee failed with the missing field and option.               |
 | Salary attachment cannot be verified | Mark the employee failed or review-required; do not duplicate the upload. |
-| One employee fails | Continue with the remaining employees. |
+| One employee fails                   | Continue with the remaining employees.                                    |
 
 Screenshots and generated files are artifacts. Outcomes may reference them, but sensitive content should not be committed or emailed raw.
 
@@ -176,12 +159,12 @@ Reports should summarize totals by portal and status, then list failed or skippe
 
 Use layers. Static checks catch some risks, but the OrangeHRM UI has custom controls and asynchronous behavior that need browser coverage.
 
-| Layer | What it proves |
-|---|---|
-| Pure unit tests | Input validation, filename generation, attachment text, duplicate-key handling, result-store behavior, reporting output. |
-| DOM fixture tests | Selector assumptions against stable OrangeHRM-like snippets without depending on the public demo site. |
-| Mocked page-object tests | Per-employee success/failure orchestration and continue-after-failure behavior. |
-| Tagged live smoke tests | Browser behavior snapshots cannot prove: login redirects, OrangeHRM custom selects, loaders, uploads, and rendered attachment rows. |
+| Layer                    | What it proves                                                                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Pure unit tests          | Input validation, filename generation, attachment text, duplicate-key handling, result-store behavior, reporting output.            |
+| DOM fixture tests        | Selector assumptions against stable OrangeHRM-like snippets without depending on the public demo site.                              |
+| Mocked page-object tests | Per-employee success/failure orchestration and continue-after-failure behavior.                                                     |
+| Tagged live smoke tests  | Browser behavior snapshots cannot prove: login redirects, OrangeHRM custom selects, loaders, uploads, and rendered attachment rows. |
 
 HTML snapshots are useful for selector regression. They are not enough by themselves because selected values can trigger dependent dropdowns, loaders, and rendered state that only appear in a real browser session.
 
@@ -223,18 +206,18 @@ The control plane should not know OrangeHRM selectors. It should know portal pro
 
 Each portal needs a profile:
 
-| Field | Purpose |
-|---|---|
-| `portal_id` | Stable portal identifier. |
-| `schedule` | Cron, calendar, or external trigger. |
-| `credential_refs` | Secret references, not raw credentials. |
-| `max_concurrency` | Portal-level active worker limit. |
+| Field                   | Purpose                                                  |
+| ----------------------- | -------------------------------------------------------- |
+| `portal_id`             | Stable portal identifier.                                |
+| `schedule`              | Cron, calendar, or external trigger.                     |
+| `credential_refs`       | Secret references, not raw credentials.                  |
+| `max_concurrency`       | Portal-level active worker limit.                        |
 | `account_session_limit` | Constraint for portals that lock out duplicate sessions. |
-| `retry_policy` | Bounded retry rules by failure class. |
-| `timeout_policy` | Navigation, action, and item-level timeouts. |
-| `quiet_hours` | Windows when workers should not touch the portal. |
-| `circuit_breaker` | Thresholds that pause a failing portal. |
-| `alert_policy` | Severity, recipient, and runbook references. |
+| `retry_policy`          | Bounded retry rules by failure class.                    |
+| `timeout_policy`        | Navigation, action, and item-level timeouts.             |
+| `quiet_hours`           | Windows when workers should not touch the portal.        |
+| `circuit_breaker`       | Thresholds that pause a failing portal.                  |
+| `alert_policy`          | Severity, recipient, and runbook references.             |
 
 Portal profiles let the system scale across many portals without over-parallelizing fragile ones.
 
@@ -250,31 +233,31 @@ If one browser item takes 20 to 60 seconds, the fleet needs roughly 25 to 75 act
 
 ### Recommended Technology Choices
 
-| Concern | Recommended default | Why |
-|---|---|---|
-| Scheduling | AWS EventBridge or Prefect | Durable schedules and visible run state. |
-| Queue | SQS | Simple durable delivery, redrive policies, and worker decoupling. |
-| Workers | ECS/Fargate containers | Browser dependency isolation and horizontal scaling. |
-| State store | RDS PostgreSQL | Central transactional state, leases, outcomes, and reports. |
-| Artifacts | S3 | Stores screenshots, generated files, reports, and downloads by reference. |
-| Secrets | AWS Secrets Manager | Keeps credentials outside code and supports rotation. |
-| Telemetry | OpenTelemetry plus CloudWatch/Grafana | Standard logs, metrics, traces, and dashboards. |
-| Exceptions | Sentry | Quick triage for code and runtime failures. |
-| Paging | PagerDuty or Opsgenie | Actionable alerts for a small team. |
+| Concern     | Recommended default                   | Why                                                                       |
+| ----------- | ------------------------------------- | ------------------------------------------------------------------------- |
+| Scheduling  | AWS EventBridge or Prefect            | Durable schedules and visible run state.                                  |
+| Queue       | SQS                                   | Simple durable delivery, redrive policies, and worker decoupling.         |
+| Workers     | ECS/Fargate containers                | Browser dependency isolation and horizontal scaling.                      |
+| State store | RDS PostgreSQL                        | Central transactional state, leases, outcomes, and reports.               |
+| Artifacts   | S3                                    | Stores screenshots, generated files, reports, and downloads by reference. |
+| Secrets     | AWS Secrets Manager                   | Keeps credentials outside code and supports rotation.                     |
+| Telemetry   | OpenTelemetry plus CloudWatch/Grafana | Standard logs, metrics, traces, and dashboards.                           |
+| Exceptions  | Sentry                                | Quick triage for code and runtime failures.                               |
+| Paging      | PagerDuty or Opsgenie                 | Actionable alerts for a small team.                                       |
 
 These are concrete defaults for the design essay. A Kubernetes-based design can also work if it keeps the same responsibilities and does not hide item state inside workers.
 
 ### Rejected Or Deferred Choices
 
-| Choice | Decision | Reason |
-|---|---|---|
-| Single cron host | Reject for production | One machine creates a single failure domain and weak recovery story. |
-| SQLite as production state | Reject for production | Good for Part 1 local runs, not for central leases, concurrent workers, or operational reporting. |
-| In-process multiprocessing only | Reject as the main scale model | Browser workers need process/container isolation and durable item state across crashes. |
-| Retrying whole jobs | Reject | Item-level retry prevents one bad employee or account from replaying unrelated successful work. |
-| Unlimited portal parallelism | Reject | Portal profiles must enforce session, lockout, rate-limit, and quiet-hour constraints. |
-| Raw screenshot/email artifacts | Reject | Artifacts need sensitivity handling, retention, and access control. |
-| Full Kubernetes platform | Defer | It may be right later, but ECS/Fargate is simpler for this scope unless the target environment already runs Kubernetes. |
+| Choice                          | Decision                       | Reason                                                                                                                  |
+| ------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Single cron host                | Reject for production          | One machine creates a single failure domain and weak recovery story.                                                    |
+| SQLite as production state      | Reject for production          | Good for Part 1 local runs, not for central leases, concurrent workers, or operational reporting.                       |
+| In-process multiprocessing only | Reject as the main scale model | Browser workers need process/container isolation and durable item state across crashes.                                 |
+| Retrying whole jobs             | Reject                         | Item-level retry prevents one bad employee or account from replaying unrelated successful work.                         |
+| Unlimited portal parallelism    | Reject                         | Portal profiles must enforce session, lockout, rate-limit, and quiet-hour constraints.                                  |
+| Raw screenshot/email artifacts  | Reject                         | Artifacts need sensitivity handling, retention, and access control.                                                     |
+| Full Kubernetes platform        | Defer                          | It may be right later, but ECS/Fargate is simpler for this scope unless the target environment already runs Kubernetes. |
 
 ### Work Item Lifecycle
 
@@ -319,11 +302,11 @@ For Portal A, a rerun verifies or converges employee state before repeating side
 
 Operators need visibility at three levels:
 
-| Level | Examples |
-|---|---|
-| Fleet | Queue depth, active workers, browser count, item throughput, error rate, capacity headroom. |
+| Level  | Examples                                                                                                    |
+| ------ | ----------------------------------------------------------------------------------------------------------- |
+| Fleet  | Queue depth, active workers, browser count, item throughput, error rate, capacity headroom.                 |
 | Portal | Success rate, failure class, circuit state, lease utilization, average duration, selector drift indicators. |
-| Item | Item key, current state, attempts, reason, artifact refs, last transition, correlation id. |
+| Item   | Item key, current state, attempts, reason, artifact refs, last transition, correlation id.                  |
 
 Alerting should be practical for a 3-person team. Alerts should include portal id, job id, item counts, failure class, recent examples, and a runbook link. Do not page on every item failure. Page on thresholds, stuck jobs, circuit breakers, data-quality failures, and missed schedule windows.
 

@@ -1,5 +1,7 @@
 import re
 from collections.abc import Awaitable
+from collections.abc import Sequence
+import difflib
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import date
@@ -77,6 +79,67 @@ class OrangeHRMUtilities:
         return re.compile(rf"^{re.escape(value)}$")
 
     @staticmethod
+    def _normalize_option_text(value: str) -> str:
+        return " ".join(value.replace("\u00a0", " ").split()).casefold()
+
+    @staticmethod
+    def _resolve_select_option(
+        label: str,
+        requested_option: str,
+        available_options: Sequence[str],
+    ) -> str:
+        normalized_requested = OrangeHRMUtilities._normalize_option_text(requested_option)
+        if not normalized_requested:
+            msg = f"Request for '{label}' select option was empty."
+            raise AssertionError(msg)
+
+        tokenized_requested = set(re.findall(r"\w+", normalized_requested))
+        normalized_options = [OrangeHRMUtilities._normalize_option_text(option) for option in available_options]
+        option_by_normalized = dict(zip(normalized_options, available_options))
+
+        # Exact and punctuation-insensitive match first.
+        exact = option_by_normalized.get(normalized_requested)
+        if exact is not None:
+            return exact
+
+        if tokenized_requested:
+            token_matches = [
+                option
+                for option, normalized_option in zip(available_options, normalized_options)
+                if tokenized_requested.issubset(set(re.findall(r"\w+", normalized_option)))
+            ]
+            if len(token_matches) == 1:
+                return token_matches[0]
+
+            if len(token_matches) > 1:
+                scored = sorted(
+                    (
+                        (
+                            difflib.SequenceMatcher(None, normalized_requested, normalized_option).ratio(),
+                            option,
+                        )
+                        for option, normalized_option in zip(available_options, normalized_options)
+                        if tokenized_requested.issubset(set(re.findall(r"\w+", normalized_option)))
+                    ),
+                    reverse=True,
+                )
+                best_score, best_option = scored[0]
+                if best_score > 0.88:
+                    return best_option
+
+        close_matches = difflib.get_close_matches(
+            normalized_requested,
+            normalized_options,
+            n=1,
+            cutoff=0.88,
+        )
+        if close_matches:
+            return option_by_normalized[close_matches[0]]
+
+        msg = f"Could not resolve '{requested_option}' for '{label}' from dropdown options: {available_options}"
+        raise AssertionError(msg)
+
+    @staticmethod
     def _field_group(container: Page | Locator, label: str) -> Locator:
         exact_label = OrangeHRMUtilities._exact_text(label)
         return (
@@ -106,16 +169,22 @@ class OrangeHRMUtilities:
             expect(dropdown).to_be_visible(timeout=10000),
         )
 
+        options_text = await _with_element_context(
+            f"collecting '{label}' select options",
+            dropdown.locator(".oxd-select-option").all_inner_texts(),
+        )
+        resolved_option = OrangeHRMUtilities._resolve_select_option(label, option, options_text)
+
         option_locator = dropdown.locator(
             ".oxd-select-option",
-            has_text=OrangeHRMUtilities._exact_text(option),
+            has_text=OrangeHRMUtilities._exact_text(resolved_option),
         ).first
         await _with_element_context(
-            f"waiting for option '{option}' to appear for '{label}'",
+            f"waiting for option '{resolved_option}' to appear for '{label}'",
             expect(option_locator).to_be_visible(timeout=30000),
         )
         await _with_element_context(
-            f"selecting option '{option}' for '{label}'",
+            f"selecting option '{resolved_option}' for '{label}'",
             option_locator.click(force=True),
         )
 
