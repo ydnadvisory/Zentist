@@ -31,11 +31,13 @@ portals/saucedemo: Sauce Demo page objects and workflows
 
 
 def _register_default_portals() -> None:
+    """Register built-in portals into runtime registry."""
     if "orangehrm" not in get_portal_names():
         register_portal(ORANGEHRM_ADAPTER)
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build CLI parser with shared commands and portal-specific options."""
     _register_default_portals()
     available_portals = get_portal_names()
     if not available_portals:
@@ -69,6 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _load_employee_records(path: Path | None) -> list[dict[str, str]] | None:
+    """Load and validate employee input JSON file."""
     if path is None:
         return None
 
@@ -106,6 +109,7 @@ def _write_report(
     settings: RuntimeSettings,
     outcomes: Sequence[WorkItemOutcome],
 ) -> Path:
+    """Render summary report and send it through configured email connector."""
     report = render_summary_report(outcomes)
     settings.report_output_dir.mkdir(parents=True, exist_ok=True)
     report_path = settings.report_output_dir / f"{context.run_id}-summary.txt"
@@ -128,19 +132,23 @@ def _write_report(
 def _run_selected_portal(
     *, args: argparse.Namespace, context: RunContext, settings: RuntimeSettings
 ) -> list[WorkItemOutcome]:
+    """Run selected portal adapter and return item outcomes."""
     adapter = get_portal(args.portal)
 
     async def _run() -> list[WorkItemOutcome]:
+        """Execute portal adapter asynchronously."""
         return await adapter.run(args, context, settings)
 
     return list(asyncio.run(_run()))
 
 
 def _has_failed_outcome(outcomes: Sequence[WorkItemOutcome]) -> bool:
+    """Return True when any item outcome failed."""
     return any(outcome.status == OutcomeStatus.FAILURE for outcome in outcomes)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """CLI entry point for check-config, structure, and run workflows."""
     parser = build_parser()
     args = parser.parse_args(argv)
 
