@@ -168,6 +168,13 @@ class OrangeHRM(PortalRunner[OrangeHRMContext]):
                 reason=f"Timeout occurred: {error!s}.",
                 output_refs={"screenshot": str(screenshot_path)},
             )
+        except AssertionError as error:
+            return WorkItemOutcome(
+                portal=self.portal_name,
+                item_key=employee.employee_key,
+                status=OutcomeStatus.FAILURE,
+                reason=f"Assertion failed: {error!s}",
+            )
         except (ConfigurationError, PortalAutomationError, PlaywrightError, OSError) as error:
             return WorkItemOutcome(
                 portal=self.portal_name,

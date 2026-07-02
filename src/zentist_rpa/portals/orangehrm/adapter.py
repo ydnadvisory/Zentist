@@ -1,15 +1,20 @@
 from __future__ import annotations
 
-import argparse
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from zentist_rpa.connectors.settings import RuntimeSettings
-from zentist_rpa.core.models import RunContext, WorkItemOutcome
 from zentist_rpa.portals.orangehrm import PORTAL_NAME
-from zentist_rpa.portals.orangehrm.orangehrm import EmployeesInput, OrangeHRM, OrangeHRMContext
+from zentist_rpa.portals.orangehrm.orangehrm import OrangeHRM, OrangeHRMContext
 from zentist_rpa.portals.registry import PortalAdapter
 from zentist_rpa.services.playwright_service import PlaywrightService
+
+if TYPE_CHECKING:
+    import argparse
+
+    from zentist_rpa.connectors.settings import RuntimeSettings
+    from zentist_rpa.core.models import RunContext, WorkItemOutcome
+    from zentist_rpa.portals.orangehrm.orangehrm import EmployeesInput
 
 
 def _configure_parser(parser: argparse.ArgumentParser) -> None:
@@ -45,7 +50,7 @@ def _build_context(_args: argparse.Namespace) -> RunContext:
 
 async def _run_orangehrm(
     args: argparse.Namespace,
-    context: OrangeHRMContext,
+    context: RunContext,
     settings: RuntimeSettings,
 ) -> list[WorkItemOutcome]:
     del settings
@@ -54,7 +59,12 @@ async def _run_orangehrm(
         playwright_service=PlaywrightService(headless=not args.headed),
         employee_records=employee_records,
     )
-    return list(await runner.run(context))
+    runner_context = OrangeHRMContext(
+        run_id=context.run_id,
+        started_at=context.started_at,
+        portal_filter=context.portal_filter,
+    )
+    return list(await runner.run(runner_context))
 
 
 def _load_employee_records(path: Path | None) -> EmployeesInput:

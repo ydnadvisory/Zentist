@@ -4,7 +4,6 @@ import argparse
 import asyncio
 import json
 import sys
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
@@ -15,10 +14,12 @@ from zentist_rpa.connectors.reporting import render_summary_report
 from zentist_rpa.connectors.result_store import SQLiteResultStore
 from zentist_rpa.connectors.settings import RuntimeSettings
 from zentist_rpa.core.models import OutcomeStatus, RunContext, RunStatus, WorkItemOutcome
+from zentist_rpa.portals.orangehrm.adapter import ORANGEHRM_ADAPTER
 from zentist_rpa.portals.registry import get_portal, get_portal_names, register_portal
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from pathlib import Path
 
 
 STRUCTURE_TEXT = """core: runner contracts, run context, outcomes, exceptions
@@ -30,8 +31,6 @@ portals/saucedemo: Sauce Demo page objects and workflows
 
 
 def _register_default_portals() -> None:
-    from zentist_rpa.portals.orangehrm.adapter import ORANGEHRM_ADAPTER
-
     if "orangehrm" not in get_portal_names():
         register_portal(ORANGEHRM_ADAPTER)
 

@@ -241,3 +241,33 @@ def test_orangehrm_process_employee_returns_failure_with_timeout_screenshot(
     assert outcome.item_key == "emp001"
     assert outcome.output_refs == {"screenshot": "var/orangehrm/debug/emp001-timeout.png"}
     assert service.page.screenshots == ["var/orangehrm/debug/emp001-timeout.png"]
+
+
+def test_orangehrm_process_employee_returns_failure_on_assertion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    employee = _employee_record()
+
+    class Utilities:
+        @staticmethod
+        async def find_or_add_employee(
+            page: FakePage,
+            employee: EmployeeRecord,
+        ) -> EmployeeRecordRef:
+            raise AssertionError("Job title option not found")
+
+    service = FakePlaywrightService()
+    runner = OrangeHRM(playwright_service=service)
+    monkeypatch.setattr(runner, "_utilities", Utilities)
+
+    outcome = asyncio.run(
+        runner._process_employee(  # noqa: SLF001
+            page=service.page,
+            employee=employee,
+            processing_date=date(2026, 7, 1),
+        )
+    )
+
+    assert outcome.status is OutcomeStatus.FAILURE
+    assert outcome.item_key == "emp001"
+    assert "Assertion failed: Job title option not found" in str(outcome.reason)
