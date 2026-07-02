@@ -48,7 +48,13 @@ def test_choose_select_option_finds_by_normalized_case_and_spacing() -> None:
     resolved = OrangeHRMUtilities._resolve_select_option(  # noqa: SLF001
         "Employment Status",
         "  contract  ",
-        ["-- Select --", "Freelance", "Full-Time Contract", "Full-Time Permanent", "Part-Time Internship"],
+        [
+            "-- Select --",
+            "Freelance",
+            "Full-Time Contract",
+            "Full-Time Permanent",
+            "Part-Time Internship",
+        ],
     )
 
     assert resolved == "Full-Time Contract"

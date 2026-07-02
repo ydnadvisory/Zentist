@@ -1,7 +1,6 @@
-import re
-from collections.abc import Awaitable
-from collections.abc import Sequence
 import difflib
+import re
+from collections.abc import Awaitable, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import date
@@ -41,6 +40,8 @@ class SalaryAttachmentResult:
 
 
 class OrangeHRMUtilities:
+    _MATCH_THRESHOLD = 0.88
+
     _url_base = "https://opensource-demo.orangehrmlive.com"
     _login_path = "/web/index.php/auth/login"
     _employee_list_path = "/web/index.php/pim/viewEmployeeList"
@@ -94,8 +95,10 @@ class OrangeHRMUtilities:
             raise AssertionError(msg)
 
         tokenized_requested = set(re.findall(r"\w+", normalized_requested))
-        normalized_options = [OrangeHRMUtilities._normalize_option_text(option) for option in available_options]
-        option_by_normalized = dict(zip(normalized_options, available_options))
+        normalized_options = [
+            OrangeHRMUtilities._normalize_option_text(option) for option in available_options
+        ]
+        option_by_normalized = dict(zip(normalized_options, available_options, strict=True))
 
         # Exact and punctuation-insensitive match first.
         exact = option_by_normalized.get(normalized_requested)
@@ -105,7 +108,9 @@ class OrangeHRMUtilities:
         if tokenized_requested:
             token_matches = [
                 option
-                for option, normalized_option in zip(available_options, normalized_options)
+                for option, normalized_option in zip(
+                    available_options, normalized_options, strict=True
+                )
                 if tokenized_requested.issubset(set(re.findall(r"\w+", normalized_option)))
             ]
             if len(token_matches) == 1:
@@ -115,28 +120,35 @@ class OrangeHRMUtilities:
                 scored = sorted(
                     (
                         (
-                            difflib.SequenceMatcher(None, normalized_requested, normalized_option).ratio(),
+                            difflib.SequenceMatcher(
+                                None, normalized_requested, normalized_option
+                            ).ratio(),
                             option,
                         )
-                        for option, normalized_option in zip(available_options, normalized_options)
+                        for option, normalized_option in zip(
+                            available_options, normalized_options, strict=True
+                        )
                         if tokenized_requested.issubset(set(re.findall(r"\w+", normalized_option)))
                     ),
                     reverse=True,
                 )
                 best_score, best_option = scored[0]
-                if best_score > 0.88:
+                if best_score > OrangeHRMUtilities._MATCH_THRESHOLD:
                     return best_option
 
         close_matches = difflib.get_close_matches(
             normalized_requested,
             normalized_options,
             n=1,
-            cutoff=0.88,
+            cutoff=OrangeHRMUtilities._MATCH_THRESHOLD,
         )
         if close_matches:
             return option_by_normalized[close_matches[0]]
 
-        msg = f"Could not resolve '{requested_option}' for '{label}' from dropdown options: {available_options}"
+        msg = (
+            f"Could not resolve '{requested_option}' for '{label}' from dropdown options: "
+            f"{available_options}"
+        )
         raise AssertionError(msg)
 
     @staticmethod
