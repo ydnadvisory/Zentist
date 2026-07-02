@@ -231,6 +231,23 @@ The stated target is about 30,000 work items per day. If the processing window i
 
 If one browser item takes 20 to 60 seconds, the fleet needs roughly 25 to 75 active item processors plus headroom. That is infrastructure capacity, not permission to run 75 sessions against one portal. Portal profiles and credential/session limits still set the real concurrency cap.
 
+### Future Work for Throughput
+
+The architecture should move toward these concrete capabilities before scaling beyond local runs:
+
+- Add a bounded worker pool in the runner path to process multiple employees in parallel while keeping shared portal constraints.
+- Introduce portal-safe concurrency settings (e.g., `max_concurrency`, `session_limit`, `retry_budget`) driven by `PortalProfile`.
+- Keep a typed per-item timing model (`queue_wait`, `open_employee`, `save_job`, `attachment_check`, `upload`, `outcome_write`) and persist key metrics to support throughput tuning.
+- Split idempotency checks from side effects:
+  - fast local marker check,
+  - lightweight portal-state validation,
+  - conditional upload only when state diverges.
+- Add automatic circuit-breaker behavior for repeated portal/system faults so workers pause and do not amplify failures.
+- Add bounded retries only on identified transient failure classes (navigation, transient timeouts), not on deterministic business failures.
+- Add run-level warmup and teardown costs to the throughput model; measure per-item and per-run overhead separately.
+- Add work replay policy for failed items (`retry`, `manual`, `skip`) without rerunning already-converged items.
+- Add queue-level backpressure and visibility timeout handling before adding more worker instances.
+
 ### Recommended Technology Choices
 
 | Concern     | Recommended default                   | Why                                                                       |
